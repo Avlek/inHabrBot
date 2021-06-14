@@ -2,29 +2,33 @@ package impl
 
 import (
 	"fmt"
+	"log"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gocolly/colly"
 )
 
+const crawlerTimeout = time.Minute
+
 type Crawler struct {
+	server *Server
 }
 
 func NewCrawler() *Crawler {
 	return &Crawler{}
 }
 
-func (crawler *Crawler) Run(quit chan error) {
+func (crawler *Crawler) Run() error {
 	for {
-		time.After(time.Second)
-
 		err := crawler.Parse()
 		if err != nil {
-			log.Errorf("crawler error: %s", err)
-			quit <- err
+			log.Printf("crawler error: %s", err)
+			return err
 		}
 
-		quit <- nil
+		time.Sleep(crawlerTimeout)
 	}
 }
 
@@ -32,10 +36,24 @@ func (crawler *Crawler) Parse() error {
 	c := colly.NewCollector()
 
 	c.OnHTML("div.posts_list", func(e *colly.HTMLElement) {
-		e.ForEach("a.post__title_link", func(_ int, a *colly.HTMLElement) {
-			fmt.Println(a.Attr("href"))
+		e.ForEachWithBreak("article.post", func(_ int, a *colly.HTMLElement) bool {
+			link := a.ChildAttr(".post__title a", "href")
+			parsedLink := strings.Split(strings.TrimRight(link, "/"), "/")
+			id, _ := strconv.Atoi(parsedLink[len(parsedLink)-1])
+			post := Post{
+				Preview: PostPreview{
+					ID:          uint64(id),
+					Title:       a.ChildText(".post__title a"),
+					Author:      a.ChildText(".post__meta .user-info__nickname"),
+					Link:        link,
+					PublishedAt: a.ChildText(".post__time"),
+				},
+			}
+			message := fmt.Sprintf("%s\n%s", post.Preview.Link, post.Preview.PublishedAt)
+			_ = crawler.server.tg.SendMessageToAdmin(message)
+			return false
 		})
 	})
 
-	return c.Visit("https://habr.com/ru/all/")
+	return c.Visit("https://habr.com/ru/hub/controllers/")
 }
