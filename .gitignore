@@ -4,3 +4,4 @@ dev.yaml
 prod.yaml
 
 go.sum
+*.lua

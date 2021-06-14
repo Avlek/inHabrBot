@@ -23,10 +23,6 @@ func NewTelegramBot(adminChatID int64, apiKey string) (*telegramBotAPI, error) {
 	}, nil
 }
 
-func (tg *telegramBotAPI) ParseMessage() string {
-	return ""
-}
-
 func (tg *telegramBotAPI) SendMessage(chatID int64, text string) error {
 	msg := tgbotapi.NewMessage(chatID, text)
 	_, err := tg.bot.Send(msg)

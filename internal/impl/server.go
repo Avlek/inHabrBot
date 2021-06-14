@@ -1,8 +1,12 @@
 package impl
 
 import (
+	"context"
+	"fmt"
 	"io/ioutil"
 	"log"
+
+	"github.com/go-redis/redis/v8"
 
 	"gopkg.in/yaml.v2"
 )
@@ -12,14 +16,22 @@ type Config struct {
 		BotToken    string `yaml:"bot_token"`
 		AdminChatID int64  `yaml:"admin_chat_id"`
 	} `yaml:"telegram"`
+	Redis struct {
+		Host string `yaml:"host"`
+		Port int64  `yaml:"port"`
+	} `yaml:"redis"`
 }
 
 type Server struct {
-	tg *telegramBotAPI
+	config *Config
+	tg     *telegramBotAPI
+	db     *DB
 }
 
 func NewServer() *Server {
-	return &Server{}
+	return &Server{
+		config: getConf(),
+	}
 }
 
 func getConf() *Config {
@@ -37,13 +49,16 @@ func getConf() *Config {
 }
 
 func (server *Server) Run() (err error) {
-	conf := getConf()
-	crawler := NewCrawler()
-	crawler.server = server
-	server.tg, err = NewTelegramBot(conf.Telegram.AdminChatID, conf.Telegram.BotToken)
+	server.tg, err = NewTelegramBot(server.config.Telegram.AdminChatID, server.config.Telegram.BotToken)
 	if err != nil {
 		return err
 	}
 
-	return crawler.Run()
+	server.db = NewRedisConnect(&redis.Options{
+		Addr: fmt.Sprintf("%s:%d", server.config.Redis.Host, server.config.Redis.Port),
+	})
+
+	crawler := NewCrawler(server)
+
+	return crawler.Run(context.Background())
 }

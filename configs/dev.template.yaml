@@ -1,3 +1,8 @@
 telegram:
   bot_token: "<token>"
   admin_chat_id: 123
+
+redis:
+  host: "<host>"
+  port: 123
+  password: "<password>"
