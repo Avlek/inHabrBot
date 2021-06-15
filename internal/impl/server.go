@@ -2,24 +2,30 @@ package impl
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"log"
 
-	"github.com/go-redis/redis/v8"
-
 	"gopkg.in/yaml.v2"
 )
+
+type RedisConfig struct {
+	Host       string `yaml:"host"`
+	Port       int64  `yaml:"port"`
+	Expiration int64  `yaml:"expiration"`
+}
+
+type ParserConfig struct {
+	URL     string `yaml:"url"`
+	Timeout int64  `yaml:"timeout"`
+}
 
 type Config struct {
 	Telegram struct {
 		BotToken  string `yaml:"bot_token"`
 		ChannelID int64  `yaml:"channel_id"`
 	} `yaml:"telegram"`
-	Redis struct {
-		Host string `yaml:"host"`
-		Port int64  `yaml:"port"`
-	} `yaml:"redis"`
+	Redis  RedisConfig  `yaml:"redis"`
+	Parser ParserConfig `yaml:"parser"`
 }
 
 type Server struct {
@@ -49,9 +55,7 @@ func getConf() *Config {
 }
 
 func (server *Server) Run() (err error) {
-	server.db = NewRedisConnect(&redis.Options{
-		Addr: fmt.Sprintf("%s:%d", server.config.Redis.Host, server.config.Redis.Port),
-	})
+	server.db = NewRedisConnect(server.config.Redis)
 
 	tg, err := NewTelegramBot(server.config.Telegram.ChannelID, server.config.Telegram.BotToken)
 	if err != nil {

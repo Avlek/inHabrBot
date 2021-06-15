@@ -9,15 +9,17 @@ import (
 	"github.com/gocolly/colly"
 )
 
-const crawlerTimeout = 3 * time.Minute
-
 type Crawler struct {
-	server *Server
+	server        *Server
+	url           string
+	parserTimeout time.Duration
 }
 
 func NewCrawler(server *Server) *Crawler {
 	return &Crawler{
-		server: server,
+		server:        server,
+		url:           server.config.Parser.URL,
+		parserTimeout: time.Duration(server.config.Parser.Timeout),
 	}
 }
 
@@ -39,7 +41,7 @@ func (c *Crawler) Run(ctx context.Context) error {
 			return err
 		}
 
-		time.Sleep(crawlerTimeout)
+		time.Sleep(c.parserTimeout * time.Minute)
 	}
 }
 
@@ -61,7 +63,7 @@ func (c *Crawler) GetPosts() ([]Post, error) {
 		})
 	})
 
-	err := col.Visit("https://habr.com/ru/all/top25/")
+	err := col.Visit(c.url)
 	if err != nil {
 		return nil, err
 	}

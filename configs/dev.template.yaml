@@ -5,4 +5,8 @@ telegram:
 redis:
   host: "<host>"
   port: 123
-  password: "<password>"
+  expiration: 123
+
+parser:
+  url: "https://habr.com/ru/all/top50/"
+  timeout: 5
