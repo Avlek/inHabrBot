@@ -26,6 +26,6 @@ func (db *DB) Get(ctx context.Context, key string) (interface{}, error) {
 }
 
 func (db *DB) Set(ctx context.Context, key string, val interface{}) error {
-	cmd := db.conn.Set(ctx, key, val, 24*time.Hour)
+	cmd := db.conn.Set(ctx, key, val, 30*24*time.Hour)
 	return cmd.Err()
 }

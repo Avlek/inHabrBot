@@ -1,24 +1,25 @@
 package impl
 
 import (
+	"context"
 	"log"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
 type telegramBotAPI struct {
-	adminChatID int64
-	bot         *tgbotapi.BotAPI
+	channelID int64
+	bot       *tgbotapi.BotAPI
 }
 
-func NewTelegramBot(adminChatID int64, apiKey string) (*telegramBotAPI, error) {
+func NewTelegramBot(channelID int64, apiKey string) (*telegramBotAPI, error) {
 	bot, err := tgbotapi.NewBotAPI(apiKey)
 	if err != nil {
 		return nil, err
 	}
 
 	return &telegramBotAPI{
-		adminChatID,
+		channelID,
 		bot,
 	}, nil
 }
@@ -32,11 +33,11 @@ func (tg *telegramBotAPI) SendMessage(chatID int64, text string) error {
 	return err
 }
 
-func (tg *telegramBotAPI) SendMessageToAdmin(text string) error {
-	msg := tgbotapi.NewMessage(tg.adminChatID, text)
-	_, err := tg.bot.Send(msg)
-	if err != nil {
-		log.Println(err)
+func (tg *telegramBotAPI) SendPostsToChannel(ctx context.Context, posts []Post) {
+	for _, post := range posts {
+		err := tg.SendMessage(tg.channelID, post.Link)
+		if err != nil {
+			log.Println("SendPostsToChannel error:", err)
+		}
 	}
-	return err
 }

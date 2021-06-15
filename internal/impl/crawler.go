@@ -3,10 +3,7 @@ package impl
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gocolly/colly"
@@ -24,9 +21,19 @@ func NewCrawler(server *Server) *Crawler {
 	}
 }
 
-func (crawler *Crawler) Run(ctx context.Context) error {
+func (c *Crawler) InitCrawler(ctx context.Context) error {
+	posts, err := c.GetPosts()
+	if err != nil {
+		return err
+	}
+
+	_, err = c.SavePosts(ctx, posts)
+	return err
+}
+
+func (c *Crawler) Run(ctx context.Context) error {
 	for {
-		err := crawler.ParseList(ctx)
+		err := c.Parser(ctx)
 		if err != nil {
 			log.Printf("crawler error: %s", err)
 			return err
@@ -36,60 +43,70 @@ func (crawler *Crawler) Run(ctx context.Context) error {
 	}
 }
 
-func (crawler *Crawler) ParseList(ctx context.Context) error {
-	c := colly.NewCollector()
+func (c *Crawler) GetPosts() ([]Post, error) {
+	var posts []Post
 
-	c.OnHTML("div.posts_list", func(e *colly.HTMLElement) {
-		e.ForEach("article.post", func(_ int, a *colly.HTMLElement) {
-			link := a.ChildAttr(".post__title a", "href")
-			parsedLink := strings.Split(strings.TrimRight(link, "/"), "/")
-			sid := parsedLink[len(parsedLink)-1]
-			id, _ := strconv.Atoi(sid)
-
+	col := colly.NewCollector()
+	col.OnHTML("div.posts_list", func(e *colly.HTMLElement) {
+		e.ForEach("li.content-list__item_post", func(_ int, a *colly.HTMLElement) {
 			post := Post{
-				Preview: PostPreview{
-					ID:          uint64(id),
-					Title:       a.ChildText(".post__title a"),
-					Author:      a.ChildText(".post__meta .user-info__nickname"),
-					Link:        link,
-					PublishedAt: a.ChildText(".post__time"),
-				},
+				ID:          a.Attr("id"),
+				Title:       a.ChildText(".post__title a"),
+				Author:      a.ChildText(".post__meta .user-info__nickname"),
+				Link:        a.ChildAttr(".post__title a", "href"),
+				PublishedAt: a.ChildText(".post__time"),
 			}
-			item, err := crawler.server.db.Get(ctx, sid)
-			if err != nil {
-				log.Println("redis get error:", err)
-			}
-			if item == nil {
-				body := crawler.ParsePost(link)
-				if body.PublishedAt.Before(time.Now().Add(-5 * time.Hour)) {
-					return
-				}
 
-				bPost, err := json.Marshal(post)
-				if err != nil {
-					log.Println("redis set error:", err)
-				}
-				err = crawler.server.db.Set(ctx, sid, bPost)
-				if err != nil {
-					log.Println("redis set error:", err)
-				}
-				message := fmt.Sprintf("%s\n%s", post.Preview.Link, post.Preview.PublishedAt)
-				_ = crawler.server.tg.SendMessageToAdmin(message)
-			}
+			posts = append(posts, post)
 		})
 	})
 
-	return c.Visit("https://habr.com/ru/all/top25/")
+	err := col.Visit("https://habr.com/ru/all/top25/")
+	if err != nil {
+		return nil, err
+	}
+	return posts, nil
 }
 
-func (crawler *Crawler) ParsePost(url string) *PostBody {
-	c := colly.NewCollector()
-	body := &PostBody{}
-	c.OnHTML("article.post", func(e *colly.HTMLElement) {
-		str := e.ChildAttr(".post__time", "data-time_published")
-		body.PublishedAt, _ = time.Parse("2006-01-02T15:04Z", str)
-	})
+func (c *Crawler) Parser(ctx context.Context) error {
 
-	_ = c.Visit(url)
-	return body
+	posts, err := c.GetPosts()
+	if err != nil {
+		return err
+	}
+
+	newPosts, err := c.SavePosts(ctx, posts)
+	if err != nil {
+		return err
+	}
+	if len(newPosts) > 0 {
+		c.server.tg.SendPostsToChannel(ctx, newPosts)
+	}
+	return nil
+}
+
+func (c *Crawler) SavePosts(ctx context.Context, posts []Post) ([]Post, error) {
+	var newPosts []Post
+	for _, post := range posts {
+		if post.Link == "" {
+			continue
+		}
+		item, err := c.server.db.Get(ctx, post.ID)
+		if err != nil {
+			return nil, err
+		}
+		if item == nil {
+			var bPost []byte
+			bPost, err = json.Marshal(post)
+			if err != nil {
+				return nil, err
+			}
+			err = c.server.db.Set(ctx, post.ID, bPost)
+			if err != nil {
+				return nil, err
+			}
+			newPosts = append(newPosts, post)
+		}
+	}
+	return newPosts, nil
 }

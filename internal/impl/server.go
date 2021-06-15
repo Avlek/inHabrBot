@@ -13,8 +13,8 @@ import (
 
 type Config struct {
 	Telegram struct {
-		BotToken    string `yaml:"bot_token"`
-		AdminChatID int64  `yaml:"admin_chat_id"`
+		BotToken  string `yaml:"bot_token"`
+		ChannelID int64  `yaml:"channel_id"`
 	} `yaml:"telegram"`
 	Redis struct {
 		Host string `yaml:"host"`
@@ -49,16 +49,23 @@ func getConf() *Config {
 }
 
 func (server *Server) Run() (err error) {
-	server.tg, err = NewTelegramBot(server.config.Telegram.AdminChatID, server.config.Telegram.BotToken)
-	if err != nil {
-		return err
-	}
-
 	server.db = NewRedisConnect(&redis.Options{
 		Addr: fmt.Sprintf("%s:%d", server.config.Redis.Host, server.config.Redis.Port),
 	})
 
-	crawler := NewCrawler(server)
+	tg, err := NewTelegramBot(server.config.Telegram.ChannelID, server.config.Telegram.BotToken)
+	if err != nil {
+		return err
+	}
+	server.tg = tg
 
-	return crawler.Run(context.Background())
+	ctx := context.Background()
+
+	crawler := NewCrawler(server)
+	err = crawler.InitCrawler(ctx)
+	if err != nil {
+		return err
+	}
+
+	return crawler.Run(ctx)
 }
