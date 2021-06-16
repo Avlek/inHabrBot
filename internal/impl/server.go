@@ -54,7 +54,7 @@ func getConf() *Config {
 	return &c
 }
 
-func (server *Server) Run() (err error) {
+func (server *Server) Run(toInit bool) (err error) {
 	server.db = NewRedisConnect(server.config.Redis)
 
 	tg, err := NewTelegramBot(server.config.Telegram.ChannelID, server.config.Telegram.BotToken)
@@ -66,9 +66,11 @@ func (server *Server) Run() (err error) {
 	ctx := context.Background()
 
 	crawler := NewCrawler(server)
-	err = crawler.InitCrawler(ctx)
-	if err != nil {
-		return err
+	if toInit {
+		err = crawler.InitCrawler(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
 	return crawler.Run(ctx)

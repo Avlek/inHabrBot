@@ -38,7 +38,7 @@ func (c *Crawler) Run(ctx context.Context) error {
 		err := c.Parser(ctx)
 		if err != nil {
 			log.Printf("crawler error: %s", err)
-			return err
+			time.Sleep(10 * time.Minute)
 		}
 
 		time.Sleep(c.parserTimeout * time.Minute)
