@@ -10,20 +10,25 @@ import (
 
 type DB struct {
 	conn       *redis.Client
+	channelID  int64
+	adminID    int64
 	expiration time.Duration
 }
 
-func NewRedisConnect(config RedisConfig) *DB {
+func NewRedisConnect(config *Config) *DB {
 	return &DB{
 		conn: redis.NewClient(&redis.Options{
-			Addr: fmt.Sprintf("%s:%d", config.Host, config.Port),
+			Addr: fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port),
 		}),
-		expiration: time.Duration(config.Expiration) * time.Hour,
+		channelID:  config.Telegram.ChannelID,
+		adminID:    config.Telegram.AdminID,
+		expiration: time.Duration(config.Redis.Expiration) * time.Hour,
 	}
 }
 
 func (db *DB) Get(ctx context.Context, key string) (interface{}, error) {
-	cmd := db.conn.Get(ctx, key)
+	fullKey := fmt.Sprintf("post%d_%s", db.channelID, key)
+	cmd := db.conn.Get(ctx, fullKey)
 	if cmd.Err() == redis.Nil {
 		return nil, nil
 	}
@@ -31,6 +36,7 @@ func (db *DB) Get(ctx context.Context, key string) (interface{}, error) {
 }
 
 func (db *DB) Set(ctx context.Context, key string, val interface{}) error {
-	cmd := db.conn.Set(ctx, key, val, db.expiration)
+	fullKey := fmt.Sprintf("post%d_%s", db.channelID, key)
+	cmd := db.conn.Set(ctx, fullKey, val, db.expiration)
 	return cmd.Err()
 }

@@ -10,18 +10,20 @@ import (
 
 type telegramBotAPI struct {
 	channelID int64
+	adminID   int64
 	bot       *tgbotapi.BotAPI
 }
 
-func NewTelegramBot(channelID int64, apiKey string) (*telegramBotAPI, error) {
-	bot, err := tgbotapi.NewBotAPI(apiKey)
+func NewTelegramBot(config TelegramConfig) (*telegramBotAPI, error) {
+	bot, err := tgbotapi.NewBotAPI(config.BotToken)
 	if err != nil {
 		return nil, err
 	}
 
 	return &telegramBotAPI{
-		channelID,
-		bot,
+		channelID: config.ChannelID,
+		adminID:   config.AdminID,
+		bot:       bot,
 	}, nil
 }
 
@@ -33,6 +35,10 @@ func (tg *telegramBotAPI) SendMessage(chatID int64, text string) error {
 		log.Println(err)
 	}
 	return err
+}
+
+func (tg *telegramBotAPI) SendMessageToAdmin(text string) error {
+	return tg.SendMessage(tg.adminID, text)
 }
 
 func (tg *telegramBotAPI) SendPostsToChannel(ctx context.Context, posts []Post) {

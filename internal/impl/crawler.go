@@ -12,6 +12,7 @@ import (
 type Crawler struct {
 	server        *Server
 	url           string
+	version       int8
 	parserTimeout time.Duration
 }
 
@@ -19,12 +20,13 @@ func NewCrawler(server *Server) *Crawler {
 	return &Crawler{
 		server:        server,
 		url:           server.config.Parser.URL,
+		version:       server.config.Parser.Version,
 		parserTimeout: time.Duration(server.config.Parser.Timeout),
 	}
 }
 
 func (c *Crawler) InitCrawler(ctx context.Context) error {
-	posts, err := c.GetPosts()
+	posts, err := c.GetPosts(c.version)
 	if err != nil {
 		return err
 	}
@@ -37,7 +39,10 @@ func (c *Crawler) Run(ctx context.Context) error {
 	for {
 		err := c.Parser(ctx)
 		if err != nil {
-			log.Printf("crawler error: %s", err)
+			err = c.server.tg.SendMessageToAdmin(err.Error())
+			if err != nil {
+				log.Printf("crawler error: %s", err)
+			}
 			time.Sleep(10 * time.Minute)
 		}
 
@@ -45,23 +50,39 @@ func (c *Crawler) Run(ctx context.Context) error {
 	}
 }
 
-func (c *Crawler) GetPosts() ([]Post, error) {
+func (c *Crawler) GetPosts(version int8) ([]Post, error) {
 	var posts []Post
 
 	col := colly.NewCollector()
-	col.OnHTML("div.posts_list", func(e *colly.HTMLElement) {
-		e.ForEach("li.content-list__item_post", func(_ int, a *colly.HTMLElement) {
-			post := Post{
-				ID:          a.Attr("id"),
-				Title:       a.ChildText(".post__title a"),
-				Author:      a.ChildText(".post__meta .user-info__nickname"),
-				Link:        a.ChildAttr(".post__title a", "href"),
-				PublishedAt: a.ChildText(".post__time"),
-			}
+	if version == int8(1) {
+		col.OnHTML("div.posts_list", func(e *colly.HTMLElement) {
+			e.ForEach("li.content-list__item_post", func(_ int, a *colly.HTMLElement) {
+				post := Post{
+					ID:          a.Attr("id"),
+					Title:       a.ChildText(".post__title a"),
+					Author:      a.ChildText(".post__meta .user-info__nickname"),
+					Link:        a.ChildAttr(".post__title a", "href"),
+					PublishedAt: a.ChildText(".post__time"),
+				}
 
-			posts = append(posts, post)
+				posts = append(posts, post)
+			})
 		})
-	})
+	} else if version == int8(2) {
+		col.OnHTML("div.tm-articles-list", func(e *colly.HTMLElement) {
+			e.ForEach("article.tm-articles-list__item", func(_ int, a *colly.HTMLElement) {
+				post := Post{
+					ID:          a.Attr("id"),
+					Title:       a.ChildText(".tm-article-snippet__title-link"),
+					Author:      a.ChildText(".tm-user-info__user"),
+					Link:        "habr.com" + a.ChildAttr(".tm-article-snippet__title-link", "href"),
+					PublishedAt: a.ChildText(".tm-article-snippet__datetime-published"),
+				}
+
+				posts = append(posts, post)
+			})
+		})
+	}
 
 	err := col.Visit(c.url)
 	if err != nil {
@@ -72,7 +93,7 @@ func (c *Crawler) GetPosts() ([]Post, error) {
 
 func (c *Crawler) Parser(ctx context.Context) error {
 
-	posts, err := c.GetPosts()
+	posts, err := c.GetPosts(c.version)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 telegram:
   bot_token: "<token>"
   channel_id: 123
+  admin_id: 123
 
 redis:
   host: "<host>"
@@ -9,4 +10,5 @@ redis:
 
 parser:
   url: "https://habr.com/ru/all/top50/"
+  version: 1
   timeout: 5

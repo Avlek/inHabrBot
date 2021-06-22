@@ -16,16 +16,20 @@ type RedisConfig struct {
 
 type ParserConfig struct {
 	URL     string `yaml:"url"`
+	Version int8   `yaml:"version"`
 	Timeout int64  `yaml:"timeout"`
 }
 
+type TelegramConfig struct {
+	BotToken  string `yaml:"bot_token"`
+	ChannelID int64  `yaml:"channel_id"`
+	AdminID   int64  `yaml:"admin_id"`
+}
+
 type Config struct {
-	Telegram struct {
-		BotToken  string `yaml:"bot_token"`
-		ChannelID int64  `yaml:"channel_id"`
-	} `yaml:"telegram"`
-	Redis  RedisConfig  `yaml:"redis"`
-	Parser ParserConfig `yaml:"parser"`
+	Telegram TelegramConfig `yaml:"telegram"`
+	Redis    RedisConfig    `yaml:"redis"`
+	Parser   ParserConfig   `yaml:"parser"`
 }
 
 type Server struct {
@@ -34,14 +38,14 @@ type Server struct {
 	db     *DB
 }
 
-func NewServer() *Server {
+func NewServer(fileName string) *Server {
 	return &Server{
-		config: getConf(),
+		config: getConf(fileName),
 	}
 }
 
-func getConf() *Config {
-	yamlFile, err := ioutil.ReadFile("configs/dev.yaml")
+func getConf(fileName string) *Config {
+	yamlFile, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		log.Printf("yamlFile.Get err   #%v ", err)
 	}
@@ -55,9 +59,9 @@ func getConf() *Config {
 }
 
 func (server *Server) Run(toInit bool) (err error) {
-	server.db = NewRedisConnect(server.config.Redis)
+	server.db = NewRedisConnect(server.config)
 
-	tg, err := NewTelegramBot(server.config.Telegram.ChannelID, server.config.Telegram.BotToken)
+	tg, err := NewTelegramBot(server.config.Telegram)
 	if err != nil {
 		return err
 	}
