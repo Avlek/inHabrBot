@@ -15,9 +15,9 @@ type RedisConfig struct {
 }
 
 type ParserConfig struct {
-	URL     string `yaml:"url"`
-	Version int8   `yaml:"version"`
-	Timeout int64  `yaml:"timeout"`
+	URLS    []string `yaml:"urls"`
+	Version int8     `yaml:"version"`
+	Timeout int64    `yaml:"timeout"`
 }
 
 type TelegramConfig struct {

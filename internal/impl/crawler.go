@@ -11,7 +11,7 @@ import (
 
 type Crawler struct {
 	server        *Server
-	url           string
+	urls          []string
 	version       int8
 	parserTimeout time.Duration
 }
@@ -19,25 +19,29 @@ type Crawler struct {
 func NewCrawler(server *Server) *Crawler {
 	return &Crawler{
 		server:        server,
-		url:           server.config.Parser.URL,
+		urls:          server.config.Parser.URLS,
 		version:       server.config.Parser.Version,
 		parserTimeout: time.Duration(server.config.Parser.Timeout),
 	}
 }
 
 func (c *Crawler) InitCrawler(ctx context.Context) error {
-	posts, err := c.GetPosts(c.version)
-	if err != nil {
-		return err
+	var posts []Post
+	for _, url := range c.urls {
+		p, err := c.GetPosts(c.version, url)
+		if err != nil {
+			return err
+		}
+		posts = append(posts, p...)
 	}
-
-	_, err = c.SavePosts(ctx, posts)
+	_, err := c.SavePosts(ctx, posts)
 	return err
 }
 
 func (c *Crawler) Run(ctx context.Context) error {
+	i := 0
 	for {
-		err := c.Parser(ctx)
+		err := c.Parser(ctx, c.urls[i])
 		if err != nil {
 			err = c.server.tg.SendMessageToAdmin(err.Error())
 			if err != nil {
@@ -45,12 +49,16 @@ func (c *Crawler) Run(ctx context.Context) error {
 			}
 			time.Sleep(10 * time.Minute)
 		}
+		i++
+		if i >= len(c.urls) {
+			i = 0
+		}
 
 		time.Sleep(c.parserTimeout * time.Minute)
 	}
 }
 
-func (c *Crawler) GetPosts(version int8) ([]Post, error) {
+func (c *Crawler) GetPosts(version int8, url string) ([]Post, error) {
 	var posts []Post
 
 	col := colly.NewCollector()
@@ -84,16 +92,15 @@ func (c *Crawler) GetPosts(version int8) ([]Post, error) {
 		})
 	}
 
-	err := col.Visit(c.url)
+	err := col.Visit(url)
 	if err != nil {
 		return nil, err
 	}
 	return posts, nil
 }
 
-func (c *Crawler) Parser(ctx context.Context) error {
-
-	posts, err := c.GetPosts(c.version)
+func (c *Crawler) Parser(ctx context.Context, url string) error {
+	posts, err := c.GetPosts(c.version, url)
 	if err != nil {
 		return err
 	}
