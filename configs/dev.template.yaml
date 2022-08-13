@@ -4,11 +4,13 @@ telegram:
   admin_id: 123
 
 redis:
-  host: "<host>"
-  port: 123
-  expiration: 123
+  host: "localhost"
+  port: 6379
+  expiration: 2400
 
 parser:
-  url: "https://habr.com/ru/all/top50/"
-  version: 1
-  timeout: 5
+  urls: [
+    "https://habr.com/ru/hub/go/top10/",
+  ]
+  version: 2
+  timeout: 1

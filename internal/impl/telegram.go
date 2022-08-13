@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
@@ -43,7 +44,8 @@ func (tg *telegramBotAPI) SendMessageToAdmin(text string) error {
 
 func (tg *telegramBotAPI) SendPostsToChannel(ctx context.Context, posts []Post) {
 	for _, post := range posts {
-		err := tg.SendMessage(tg.channelID, fmt.Sprintf("%s\n<b>%s</b>", post.Link, post.PublishedAt))
+		txt := fmt.Sprintf("%s\n<i>%s</i>\n<b>%s</b>", post.Link, strings.Join(post.Tags, ", "), post.PublishedAt)
+		err := tg.SendMessage(tg.channelID, txt)
 		if err != nil {
 			log.Println("SendPostsToChannel error:", err)
 		}

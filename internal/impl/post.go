@@ -10,6 +10,7 @@ type PostBody struct {
 type Post struct {
 	ID          string
 	Title       string
+	Tags        []string
 	Author      string
 	Link        string
 	PublishedAt string

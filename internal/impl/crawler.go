@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/gocolly/colly"
@@ -40,14 +41,19 @@ func (c *Crawler) InitCrawler(ctx context.Context) error {
 
 func (c *Crawler) Run(ctx context.Context) error {
 	i := 0
+	errCount := 0
 	for {
 		err := c.Parser(ctx, c.urls[i])
 		if err != nil {
-			err = c.server.tg.SendMessageToAdmin(err.Error())
-			if err != nil {
-				log.Printf("crawler error: %s", err)
+			errCount++
+			if errCount > 2 {
+				err = c.server.tg.SendMessageToAdmin(err.Error())
+				if err != nil {
+					log.Printf("crawler error: %s", err)
+				}
 			}
-			time.Sleep(10 * time.Minute)
+		} else {
+			errCount = 0
 		}
 		i++
 		if i >= len(c.urls) {
@@ -79,10 +85,18 @@ func (c *Crawler) GetPosts(version int8, url string) ([]Post, error) {
 	} else if version == int8(2) {
 		col.OnHTML("div.tm-articles-list", func(e *colly.HTMLElement) {
 			e.ForEach("article.tm-articles-list__item", func(_ int, a *colly.HTMLElement) {
+				var tags []string
+				a.ForEach(".tm-article-snippet__hubs-item-link", func(_ int, p *colly.HTMLElement) {
+					if !strings.HasPrefix(p.Text, "Блог") {
+						p.Text = strings.Trim(p.Text, "* ")
+						tags = append(tags, p.Text)
+					}
+				})
 				post := Post{
 					ID:          a.Attr("id"),
 					Title:       a.ChildText(".tm-article-snippet__title-link"),
 					Author:      a.ChildText(".tm-user-info__user"),
+					Tags:        tags,
 					Link:        "habr.com" + a.ChildAttr(".tm-article-snippet__title-link", "href"),
 					PublishedAt: a.ChildText(".tm-article-snippet__datetime-published"),
 				}
@@ -92,6 +106,7 @@ func (c *Crawler) GetPosts(version int8, url string) ([]Post, error) {
 		})
 	}
 
+	col.SetRequestTimeout(30 * time.Second)
 	err := col.Visit(url)
 	if err != nil {
 		return nil, err
@@ -104,7 +119,6 @@ func (c *Crawler) Parser(ctx context.Context, url string) error {
 	if err != nil {
 		return err
 	}
-
 	newPosts, err := c.SavePosts(ctx, posts)
 	if err != nil {
 		return err

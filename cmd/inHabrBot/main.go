@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/avlek/inHabrBot/internal/impl"
 )
@@ -11,13 +12,16 @@ func main() {
 	toInit := false
 	fileName := "configs/dev.yaml"
 	if len(os.Args) > 1 {
-		fileName = os.Args[1]
-	}
-	if len(os.Args) > 2 {
-		if os.Args[2] == "init" {
-			toInit = true
+		for i := range os.Args {
+			if os.Args[i] == "init" {
+				toInit = true
+			}
+			if strings.HasSuffix(os.Args[i], "yaml") {
+				fileName = os.Args[i]
+			}
 		}
 	}
+
 	server := impl.NewServer(fileName)
 	err := server.Run(toInit)
 	if err != nil {
