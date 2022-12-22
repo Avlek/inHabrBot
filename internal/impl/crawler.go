@@ -3,6 +3,7 @@ package impl
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -124,7 +125,8 @@ func (c *Crawler) Parser(ctx context.Context, url string) error {
 		return err
 	}
 	if len(newPosts) > 0 {
-		c.server.tg.SendPostsToChannel(ctx, newPosts)
+		fmt.Println("test")
+		//c.server.tg.SendPostsToChannel(ctx, newPosts)
 	}
 	return nil
 }

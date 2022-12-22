@@ -1,0 +1,19 @@
+version: '3.1'
+
+services:
+  cache:
+    image: redis:7.0
+    restart: always
+    ports:
+      - 6379:6379
+
+  server:
+    image: in_habr_bot:latest
+    restart: always
+    depends_on:
+      - cache
+    environment:
+      REDIS_HOST: cache
+      REDIS_PORT: 6379
+    command:
+      - init

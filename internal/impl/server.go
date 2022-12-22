@@ -2,8 +2,8 @@ package impl
 
 import (
 	"context"
-	"io/ioutil"
 	"log"
+	"os"
 
 	"gopkg.in/yaml.v2"
 )
@@ -45,7 +45,7 @@ func NewServer(fileName string) *Server {
 }
 
 func getConf(fileName string) *Config {
-	yamlFile, err := ioutil.ReadFile(fileName)
+	yamlFile, err := os.ReadFile(fileName)
 	if err != nil {
 		log.Printf("yamlFile.Get err   #%v ", err)
 	}
@@ -53,6 +53,10 @@ func getConf(fileName string) *Config {
 	err = yaml.Unmarshal(yamlFile, &c)
 	if err != nil {
 		log.Fatalf("Unmarshal: %v", err)
+	}
+
+	if os.Getenv("REDIS_HOST") != "" {
+		c.Redis.Host = os.Getenv("REDIS_HOST")
 	}
 
 	return &c
