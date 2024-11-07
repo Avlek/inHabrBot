@@ -3,7 +3,6 @@ package impl
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -14,7 +13,6 @@ import (
 type Crawler struct {
 	server        *Server
 	urls          []string
-	version       int8
 	parserTimeout time.Duration
 }
 
@@ -22,7 +20,6 @@ func NewCrawler(server *Server) *Crawler {
 	return &Crawler{
 		server:        server,
 		urls:          server.config.Parser.URLS,
-		version:       server.config.Parser.Version,
 		parserTimeout: time.Duration(server.config.Parser.Timeout),
 	}
 }
@@ -30,7 +27,7 @@ func NewCrawler(server *Server) *Crawler {
 func (c *Crawler) InitCrawler(ctx context.Context) error {
 	var posts []Post
 	for _, url := range c.urls {
-		p, err := c.GetPosts(c.version, url)
+		p, err := c.GetPosts(url)
 		if err != nil {
 			return err
 		}
@@ -65,47 +62,31 @@ func (c *Crawler) Run(ctx context.Context) error {
 	}
 }
 
-func (c *Crawler) GetPosts(version int8, url string) ([]Post, error) {
+func (c *Crawler) GetPosts(url string) ([]Post, error) {
 	var posts []Post
 
 	col := colly.NewCollector()
-	if version == int8(1) {
-		col.OnHTML("div.posts_list", func(e *colly.HTMLElement) {
-			e.ForEach("li.content-list__item_post", func(_ int, a *colly.HTMLElement) {
-				post := Post{
-					ID:          a.Attr("id"),
-					Title:       a.ChildText(".post__title a"),
-					Author:      a.ChildText(".post__meta .user-info__nickname"),
-					Link:        a.ChildAttr(".post__title a", "href"),
-					PublishedAt: a.ChildText(".post__time"),
+	col.OnHTML("div.tm-articles-list", func(e *colly.HTMLElement) {
+		e.ForEach("article.tm-articles-list__item", func(_ int, a *colly.HTMLElement) {
+			var tags []string
+			a.ForEach(".tm-publication-hub__link", func(_ int, p *colly.HTMLElement) {
+				if !strings.HasPrefix(p.Text, "Блог") {
+					p.Text = strings.Trim(p.Text, "* ")
+					tags = append(tags, p.Text)
 				}
-
-				posts = append(posts, post)
 			})
-		})
-	} else if version == int8(2) {
-		col.OnHTML("div.tm-articles-list", func(e *colly.HTMLElement) {
-			e.ForEach("article.tm-articles-list__item", func(_ int, a *colly.HTMLElement) {
-				var tags []string
-				a.ForEach(".tm-article-snippet__hubs-item-link", func(_ int, p *colly.HTMLElement) {
-					if !strings.HasPrefix(p.Text, "Блог") {
-						p.Text = strings.Trim(p.Text, "* ")
-						tags = append(tags, p.Text)
-					}
-				})
-				post := Post{
-					ID:          a.Attr("id"),
-					Title:       a.ChildText(".tm-article-snippet__title-link"),
-					Author:      a.ChildText(".tm-user-info__user"),
-					Tags:        tags,
-					Link:        "habr.com" + a.ChildAttr(".tm-article-snippet__title-link", "href"),
-					PublishedAt: a.ChildText(".tm-article-snippet__datetime-published"),
-				}
+			post := Post{
+				ID:          a.Attr("id"),
+				Title:       a.ChildText(".tm-title__link"),
+				Author:      a.ChildText(".tm-user-info__username"),
+				Tags:        tags,
+				Link:        "habr.com" + a.ChildAttr(".tm-title__link", "href"),
+				PublishedAt: a.ChildAttr(".tm-article-datetime-published>time", "title"),
+			}
 
-				posts = append(posts, post)
-			})
+			posts = append(posts, post)
 		})
-	}
+	})
 
 	col.SetRequestTimeout(30 * time.Second)
 	err := col.Visit(url)
@@ -116,7 +97,7 @@ func (c *Crawler) GetPosts(version int8, url string) ([]Post, error) {
 }
 
 func (c *Crawler) Parser(ctx context.Context, url string) error {
-	posts, err := c.GetPosts(c.version, url)
+	posts, err := c.GetPosts(url)
 	if err != nil {
 		return err
 	}
@@ -125,8 +106,8 @@ func (c *Crawler) Parser(ctx context.Context, url string) error {
 		return err
 	}
 	if len(newPosts) > 0 {
-		fmt.Println("test")
-		//c.server.tg.SendPostsToChannel(ctx, newPosts)
+		//fmt.Println("test")
+		c.server.tg.SendPostsToChannel(ctx, newPosts)
 	}
 	return nil
 }
